@@ -2,12 +2,9 @@
 #include <iostream>
 #include <stdlib.h>
 #include <time.h>
-//#include <algorithm>
-//#include <execution>
-#include "tbb/blocked_range.h"
-#include "tbb/parallel_for.h"
-using namespace tbb;
-
+#include <thread>
+#include <execution>
+#include <algorithm>
 #include <vector>
 #include "bhqt.hpp"
 
@@ -24,30 +21,13 @@ public:
   }
 };
 
-class applyCalcForce {
-  std::vector<myNode*> my_nodes;
-  bhqt::octTree &ot;
-  float theta;
-public:
-  void operator()(const blocked_range<size_t>& r) const
-  {
-    std::vector<myNode*> nodes = my_nodes;
-    for( size_t i=r.begin(); i!=r.end(); ++i )
-      {
-	nodes[i]->_force 
-	  += ot.forceForNode(nodes[i], theta) * 5.0 / nodes[i]->weight;  
-      }
-  }
-  applyCalcForce(bhqt::octTree &ot_, std::vector<myNode*> &n, float t = 0.6):my_nodes(n),ot(ot_),theta(t) {}
-};
-
 int main(int argc, char *argv[])
 {
   unsigned int _numNodes = 1000;
   unsigned int threshold = 2;
   float theta = 0.9;
-  int iterations = 100;
-  int pthreads = 1;
+  unsigned int iterations = 100;
+  unsigned int pthreads = 1;
 
   for( int cnt = 1; cnt < argc; cnt++ )
     {
@@ -86,9 +66,7 @@ int main(int argc, char *argv[])
 		     (float)(random() % 10 + 0.1));
       }
 
-  int iteration = 0;
-  task_arena arena(pthreads);
-  for( iteration = 0; iteration < iterations; iteration++ )
+  for(int iteration = 0; iteration < iterations; iteration++ )
     {
       bhqt::octTree ot(threshold);
 
@@ -97,19 +75,11 @@ int main(int argc, char *argv[])
 	  ot.insert(_nodes[cnt]);
 	}
       ot.insert(_sun);
-      arena.execute([&]{
-      parallel_for(blocked_range<size_t>(0,_numNodes), 
-		   applyCalcForce(ot, _nodes, theta),
-		   auto_partitioner());
-      });
 
-      /*      
-      for(unsigned int cnt = 0; cnt < _numNodes; cnt++)
-	{
-	  _nodes[cnt]->_force 
-	    += ot.forceForNode(_nodes[cnt], theta) * 5.0 / _nodes[cnt]->weight;
-	}
-      */
+      std::for_each(std::execution::par, _nodes.begin(), _nodes.end(), [&](myNode* n){
+	n->_force 
+	  += ot.forceForNode(n, theta) * 5.0 / n->weight;
+      });
     }
 
   return 0;
