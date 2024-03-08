@@ -1,5 +1,4 @@
 
 
 benchmark : benchmark.cpp Makefile
-	clang++ -g -std=c++17 -Wall -O3 -o benchmark benchmark.cpp -ltbb
-
+	clang++ -gdwarf-4 -std=c++17 -Wall -Og -o benchmark benchmark.cpp -ltbb
