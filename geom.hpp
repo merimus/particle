@@ -15,7 +15,11 @@ namespace bhqt
 		
     point_t(): x(0.0), y(0.0), z(0.0){}
     point_t(double _x, double _y, double _z = 0.0):x(_x), y(_y), z(_z){}
-		
+    void set(double _x, double _y, double _z = 0.0) {
+      x = _x;
+      y = _y;
+      z = _z;
+    }
     point_t& operator*=(const double scalar)
     {
       x *= scalar;
