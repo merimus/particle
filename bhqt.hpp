@@ -5,7 +5,8 @@
 #include <vector>
 #include <stdlib.h>
 #include <math.h>
-
+#include <cassert>
+#include <atomic>
 #include "geom.hpp"
 
 using namespace std;
@@ -34,6 +35,7 @@ namespace bhqt {
     virtual ~baseNode() {}
     virtual nodeType type(void) = 0;
     virtual void insert(node*) = 0;
+    virtual void insert(node*, std::vector<std::mutex>&) = 0;
     virtual point_t forceForNode(node*, float) = 0;
     virtual point_t barycenter(void) = 0;
     virtual double qumWeight(void) = 0;
@@ -75,6 +77,9 @@ namespace bhqt {
 		
     nodeType type(void) { return LEAF; }
 		
+    void insert(node *node, std::vector<std::mutex>& locks) {
+      assert(false);
+    }
     void insert(node *node)
     {
       nodes_.push_back(node);
@@ -169,6 +174,7 @@ namespace bhqt {
 		
     baseNode *children[8];
     unsigned int threshold;
+    atomic_int num_leaves = 8;
 		
     // bounding cube of all the points in this octNode
     cube_t bbox;
@@ -236,9 +242,11 @@ namespace bhqt {
 	}
 			
     }
-		
-    void insert(node *node)
-    {
+
+    /** This sucks... should be an unlocked version of the below function and only called during the 
+     * constructor.
+     */
+    void insert(node *node) {
       bbox += node->point;
       weight += node->weight;
       accumPoints += node->point * node->weight;
@@ -274,6 +282,54 @@ namespace bhqt {
 	      delete children[oct];
 	      children[oct] = n;
 	    }
+	}
+    }
+    void insert(node *node, std::vector<std::mutex> &locks)
+    {
+      int leaves = num_leaves.load();
+      if (leaves) {
+	locks[(size_t)this % locks.size()].lock();
+      }
+      bbox += node->point;
+      weight += node->weight;
+      accumPoints += node->point * node->weight;
+			
+      barycenter_ = accumPoints / weight;
+			
+      int oct = 0;
+			
+      if( node->point.x > center.x )
+	oct += 2;
+      if( node->point.y > center.y )
+	oct += 1;
+      if( node->point.z > center.z )
+	oct += 4;
+
+      if( children[oct] == NULL )
+	{
+	  children[oct] = new leafNode();
+	}
+			
+      if( children[oct]->type() == OCTNODE )
+	{
+	  if (leaves) {
+	    locks[(size_t)this % locks.size()].unlock();
+	  }
+	  children[oct]->insert(node, locks);
+	}
+      else
+	{
+	  children[oct]->insert(node);
+	  if( ((leafNode*)children[oct])->size() > threshold &&
+	      center != node->point)
+	    {
+	      baseNode *n;
+	      n = new octNode(threshold, (leafNode*)children[oct]);
+	      delete children[oct];
+	      children[oct] = n;
+	      num_leaves--;
+	    }
+	  locks[(size_t)this % locks.size()].unlock();
 	}
     }
 		
@@ -348,6 +404,7 @@ namespace bhqt {
   private:
     baseNode *root;
     unsigned int threshold;
+    atomic_int num_leaves = 1;
   public:
     octTree(unsigned int t = 4) : root(NULL), threshold(t)
     {
@@ -363,11 +420,18 @@ namespace bhqt {
     {
       root->print(0);
     }
-    void insert(node *node)
+    void insert(node *node, std::vector<std::mutex> &locks)
     {
+      int leaves = num_leaves.load();
+      if (leaves) {
+	locks[(size_t)this % locks.size()].lock();
+      }
       if( root->type() == OCTNODE )
 	{
-	  root->insert(node);
+	  if (leaves) {
+	    locks[(size_t)this % locks.size()].unlock();
+	  }
+	  root->insert(node, locks);
 	}
       else
 	{
@@ -378,7 +442,9 @@ namespace bhqt {
 	      n = new octNode(threshold, (leafNode*)root);
 	      delete root;
 	      root = n;
+	      num_leaves--;
 	    }
+	  locks[(size_t)this % locks.size()].unlock();
 	}			
     }
 		
