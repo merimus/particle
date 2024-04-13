@@ -1,118 +1,194 @@
-#include <vsg/all.h>
-
-#ifdef vsgXchange_FOUND
-#include <vsgXchange/all.h>
-#endif
-
+// Open a window with GLFW, check default OpenGL version, set background color red
+// Register callback functions for GLFW errors, key pressed and window resized events
+// Require minimum OpenGL 3.2 core profile and remove the fixed pipeline functionality
+#define GLEW_STATIC
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+#include <cstdlib>
 #include <iostream>
 
-int main(int argc, char** argv)
+// Define a few callback functions:
+void window_resized(GLFWwindow* window, int width, int height);
+void key_pressed(GLFWwindow* window, int key, int scancode, int action, int mods);
+void show_glfw_error(int error, const char* description);
+
+
+/*
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+out VS_OUT
 {
-    auto options = vsg::Options::create();
-    auto windowTraits = vsg::WindowTraits::create();
-    windowTraits->windowTitle = "MyFirstVsgApplication";
+    vec2 TexCoords;
+} vs_out;
 
-    // set up defaults and read command line arguments to override them
-    vsg::CommandLine arguments(&argc, argv);
-    windowTraits->debugLayer = arguments.read({"--debug","-d"});
-    windowTraits->apiDumpLayer = arguments.read({"--api","-a"});
-    if (arguments.read({"--fullscreen", "--fs"})) windowTraits->fullscreen = true;
-    if (arguments.read({"--window", "-w"}, windowTraits->width, windowTraits->height)) { windowTraits->fullscreen = false; }
-    auto horizonMountainHeight = arguments.value(0.0, "--hmh");
-    arguments.read("--screen", windowTraits->screenNum);
-    arguments.read("--display", windowTraits->display);
+void main()
+{
+    gl_Position = projection * view * model * vec4(aPos, 1.0);
+*/
+const char* vertexShaderSource = R"glsl(
+#version 330 core
+in vec3 position;
+void main()
+{
+   gl_Position = vec4(position, 1.0);
+   gl_PointSize = 100.0;
+}
+)glsl";
 
-    if (arguments.errors()) return arguments.writeErrorMessages(std::cerr);
+const char* fragmentShaderSource = R"glsl(
+#version 330 core
+out vec4 outColor;
 
-#ifdef vsgXchange_all
-    // add use of vsgXchange's support for reading and writing 3rd party file formats
-    options->add(vsgXchange::all::create());
-#endif
+void main()
+{
+    outColor = vec4(1.0f, 0.5f, 0.2f, 0.1f);
+}
+)glsl";
 
-    auto scene = vsg::Group::create();
+void compileShader(unsigned int shaderId, const char** source) {
+    glShaderSource(shaderId, 1, source, NULL);
+    glCompileShader(shaderId);
 
-    // read any vsg files from command line arguments
-    for (int i=1; i<argc; ++i)
+    int  success;
+    char infoLog[512];
+    glGetShaderiv(shaderId, GL_COMPILE_STATUS, &success);
+    if (!success)
     {
-        vsg::Path filename = arguments[i];
-        auto loaded_scene = vsg::read_cast<vsg::Node>(filename, options);
-        if (loaded_scene)
-        {
-            scene->addChild(loaded_scene);
-            arguments.remove(i, 1);
-            --i;
-        }
+        glGetShaderInfoLog(shaderId, 512, NULL, infoLog);
+        std::cout << "ERROR::SHADER::COMPILATION_FAILED\n" << infoLog << std::endl;
+        exit(-1);
+    }
+}
+
+int main() {
+    // Register the GLFW error callback function
+    glfwSetErrorCallback(show_glfw_error);
+
+    // Initialize GLFW
+    if (!glfwInit()) {
+        std::cerr << "Failed to initialize GLFW! I'm out!" << '\n';
+        exit(-1);
     }
 
-    if (scene->children.empty())
-    {
-        std::cout<<"No scene loaded, please specify valid 3d model(s) on command line."<<std::endl;
-        return 1;
-    }
+    // Require minimum OpenGL 3.2 core profile and remove the fixed pipeline functionality
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
 
-    // create the viewer and assign window(s) to it
-    auto viewer = vsg::Viewer::create();
-
-    vsg::ref_ptr<vsg::Window> window(vsg::Window::create(windowTraits));
+    // Open a window and attach an OpenGL context to the window surface
+    GLFWwindow* window = glfwCreateWindow(600, 600, "OpenGL 101", NULL, NULL);
     if (!window)
     {
-        std::cout<<"Could not create window."<<std::endl;
-        return 1;
+        std::cerr << "Failed to open a window! I'm out!" << '\n';
+        glfwTerminate();
+        exit(-1);
     }
 
-    viewer->addWindow(window);
+    // Set the window context current
+    glfwMakeContextCurrent(window);
 
-    // compute the bounds of the scene graph to help position the camera
-    vsg::ComputeBounds computeBounds;
-    scene->accept(computeBounds);
-    vsg::dvec3 centre = (computeBounds.bounds.min+computeBounds.bounds.max)*0.5;
-    double radius = vsg::length(computeBounds.bounds.max-computeBounds.bounds.min)*0.6;
-    double nearFarRatio = 0.0001;
+    // Register the GLFW  window resized callback function
+    glfwSetWindowSizeCallback(window, window_resized);
 
-    // set up the camera
-    auto lookAt = vsg::LookAt::create(centre+vsg::dvec3(0.0, -radius*3.5, 0.0), centre, vsg::dvec3(0.0, 0.0, 1.0));
+    // Register the GLFW  window key pressed callback function
+    glfwSetKeyCallback(window, key_pressed);
 
-    vsg::ref_ptr<vsg::ProjectionMatrix> perspective;
-    if (vsg::ref_ptr<vsg::EllipsoidModel> ellipsoidModel(scene->getObject<vsg::EllipsoidModel>("EllipsoidModel")); ellipsoidModel)
+    // Set the swap interval, 1 will use your screen refresh rate (vsync)
+    glfwSwapInterval(1);
+
+    glewExperimental = GL_TRUE;
+    GLenum err = glewInit();
+    if (GLEW_OK != err)
     {
-        // EllipsoidPerspective is useful for whole earth databases where per frame management of the camera's near & far values is optimized
-        // to the current view relative to an ellipsoid model of the earth so that when near to the earth the near and far planes are pulled in close to the eye
-        // and when far away from the earth's surface the far plane is pushed out to ensure that it encompasses the horizon line, accounting for mountains over the horizon.
-        perspective = vsg::EllipsoidPerspective::create(lookAt, ellipsoidModel, 30.0, static_cast<double>(window->extent2D().width) / static_cast<double>(window->extent2D().height), nearFarRatio, horizonMountainHeight);
+        std::cerr << "Error:" << glewGetErrorString(err) << std::endl;
+        exit(-1);
     }
-    else
-    {
-        perspective = vsg::Perspective::create(30.0, static_cast<double>(window->extent2D().width) / static_cast<double>(window->extent2D().height), nearFarRatio*radius, radius * 4.5);
+    std::cout << "Status: Using GLEW " << glewGetString(GLEW_VERSION) << std::endl;
+    std::cout << glGetString(GL_VERSION) << '\n';
+
+
+    glEnable(GL_PROGRAM_POINT_SIZE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_SRC_COLOR);
+    GLuint vao;
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+
+    float vertices[] = {
+      -0.1f, -0.1f, 0.0f,
+      0.1f, -0.0f, 0.0f,
+      0.0f,  0.1f, 0.0f
+    };
+
+    unsigned int VBO;
+    glGenBuffers(1, &VBO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+
+    unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    compileShader(vertexShader, &vertexShaderSource);
+    compileShader(fragmentShader, &fragmentShaderSource);
+    unsigned int shaderProgram;
+    shaderProgram = glCreateProgram();
+    glAttachShader(shaderProgram, vertexShader);
+    glAttachShader(shaderProgram, fragmentShader);
+    glBindFragDataLocation(shaderProgram, 0, "outColor");
+    glLinkProgram(shaderProgram);
+
+    GLint success;
+    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
+    if (!success) {
+        char infoLog[512];
+        glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog);
+        std::cerr << "Link failed " << infoLog << std::endl;
+        exit(-1);
+    }
+    glUseProgram(shaderProgram);
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+
+
+    GLint positionAttrib = glGetAttribLocation(shaderProgram, "position");
+    glEnableVertexAttribArray(positionAttrib);
+    glVertexAttribPointer(positionAttrib, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+
+
+    while (!glfwWindowShouldClose(window)) {
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        glDrawArrays(GL_POINTS, 0, 3);
+
+        glfwSwapBuffers(window);
+
+        glfwPollEvents();
     }
 
-    auto camera = vsg::Camera::create(perspective, lookAt, vsg::ViewportState::create(window->extent2D()));
+    // Destroy the window and its context
+    glfwDestroyWindow(window);
 
-    // add close handler to respond to pressing the window's close window button and to pressing escape
-    viewer->addEventHandler(vsg::CloseHandler::create(viewer));
-
-    // add a trackball event handler to control the camera view using the mouse
-    viewer->addEventHandler(vsg::Trackball::create(camera));
-
-    // create a command graph to render the scene on the specified window
-    auto commandGraph = vsg::createCommandGraphForView(window, camera, scene);
-    viewer->assignRecordAndSubmitTaskAndPresentation({commandGraph});
-
-    // compile all the Vulkan objects and transfer data required to render the scene
-    viewer->compile();
-
-    // rendering main loop
-    while (viewer->advanceToNextFrame())
-    {
-        // pass any events into EventHandlers assigned to the Viewer
-        viewer->handleEvents();
-
-        viewer->update();
-
-        viewer->recordAndSubmit();
-
-        viewer->present();
-    }
-
-    // clean up done automatically thanks to ref_ptr<>
+    // Terminate GLFW
+    glfwTerminate();
     return 0;
 }
+
+void show_glfw_error(int error, const char* description) {
+    std::cerr << "Error: " << description << '\n';
+}
+
+void window_resized(GLFWwindow* window, int width, int height) {
+    std::cout << "Window resized, new window size: " << width << " x " << height << '\n';
+}
+
+void key_pressed(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    if (key == 'Q' && action == GLFW_PRESS) {
+        glfwTerminate();
+        exit(0);
+    }
+}
+
