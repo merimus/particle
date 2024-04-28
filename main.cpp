@@ -105,15 +105,21 @@ public:
             }
         }
     }
-    glm::vec3 force(glm::vec3& p1, float m1, glm::vec3& p2, float m2) {
+  glm::vec3 __attribute__ ((noinline)) force(glm::vec3& p1, float m1, glm::vec3& p2, float m2) {
+    
         double d = glm::distance(p2, p1);
         
         // m1*m2 / r^2
-        float force = (m1 * m2) / (pow(d, 2) + sqrt(m1 + m2));
+        float force = (m1 * m2) / ((d * d) + sqrt(m1 + m2));
 
         glm::vec3 direction = glm::normalize(p2 - p1);
         return direction * force;
-    }
+	/*
+    double d = glm::distance(p2, p1);
+    glm::vec3 direction = glm::normalize(p2 - p1);
+    return direction * (float)(m2/(d*d+1.0));
+	*/
+  }
     void insert(Node* n) {
         bbox += n->position;
 
