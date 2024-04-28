@@ -20,6 +20,10 @@ using namespace std;
 #include <glm/gtx/fast_exponential.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+
 struct bbox_t {
     glm::vec3 min;
     glm::vec3 max;
@@ -346,6 +350,20 @@ int main() {
     GLint projectionUniform = glGetUniformLocation(shaderProgram, "projection");
     glProgramUniformMatrix4fv(shaderProgram, projectionUniform, 1, GL_FALSE, glm::value_ptr(projection));
 
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    ImGui::StyleColorsDark();
+     // Setup Platform/Renderer backends
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    const char* glsl_version = "#version 150";
+    ImGui_ImplOpenGL3_Init(glsl_version);
+
+    bool show_demo_window = true;
+    
     int frameCount = 0;
     double prevTime = glfwGetTime();
     while (!glfwWindowShouldClose(window)) {
@@ -357,6 +375,12 @@ int main() {
             prevTime = currentTime;
         }
 
+	ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+	ImGui::ShowDemoWindow(&show_demo_window);
+	ImGui::Render();
+	
         otNode root(1280);
 
         for (auto& n : nodes) {
@@ -377,7 +401,7 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT);
 
         glDrawArrays(GL_POINTS, 0, numNodes);
-
+	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);
 
         glfwPollEvents();
