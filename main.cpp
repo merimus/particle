@@ -8,6 +8,8 @@
 #include <iostream>
 #include <mutex>
 #include <memory>
+#include <chrono>
+using namespace std::chrono;
 using namespace std;
 
 #include <stdlib.h>
@@ -76,25 +78,25 @@ public:
 
     void updateStats(void) {
         if (type == NODE) {
-            for (auto c : children) {
+            for (auto &c : children) {
                 c.updateStats();
             }
-            glm::vec3 bc(0);
-            for (auto c : children) {
+            for (auto &c : children) {
                 weight += c.weight;
                 baryCenter += c.baryCenter * float(c.weight);
-                baryCenter /= weight;
             }
-            bboxSize = (bbox.max.x - bbox.min.x) + 
+            baryCenter /= weight;
+            bboxSize = ((bbox.max.x - bbox.min.x) +
                 (bbox.max.y - bbox.min.y) + 
-                (bbox.max.z - bbox.min.z) / 3.0;
+                (bbox.max.z - bbox.min.z)) / 3.0;
         }
         else {
             for (auto n : nodes) {
                 weight += n->weight;
                 baryCenter += n->position * n->weight;
             }
-            baryCenter /= weight;
+            if (nodes.size() > 0)
+                baryCenter /= weight;
         }
     }
 
@@ -109,7 +111,7 @@ public:
             }
         }
     }
-  glm::vec3 __attribute__ ((noinline)) force(glm::vec3& p1, float m1, glm::vec3& p2, float m2) {
+  glm::vec3 force(glm::vec3& p1, float m1, glm::vec3& p2, float m2) {
     
         double d = glm::distance(p2, p1);
         
@@ -137,7 +139,7 @@ public:
             nodes.push_back(n);
             if (nodes.size() == threshold) {
                 // Initialize child nodes.
-                for (int i = 0; i < threshold; ++i) {
+                for (int i = 0; i < 8; ++i) {
                     children.push_back(otNode(threshold));
                 }
                 center = bbox.center();
@@ -271,7 +273,7 @@ GLFWwindow* initGlfw(void) {
     return window;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     GLFWwindow* window = initGlfw();
 
     glewExperimental = GL_TRUE;
@@ -292,8 +294,13 @@ int main() {
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
 
-    const int numNodes = 1000;
-
+    //int numNodes = atoi(argv[1]);
+    //int threshold = atoi(argv[2]);
+    
+    int numNodes = 10000;
+    int threshold = 128;
+    
+    float theta = 0.7;
     vector<Node> nodes(numNodes);
 
     // Initialize positions in a ball.
@@ -361,8 +368,6 @@ int main() {
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     const char* glsl_version = "#version 150";
     ImGui_ImplOpenGL3_Init(glsl_version);
-
-    bool show_demo_window = true;
     
     int frameCount = 0;
     double prevTime = glfwGetTime();
@@ -375,25 +380,52 @@ int main() {
             prevTime = currentTime;
         }
 
-	ImGui_ImplOpenGL3_NewFrame();
+        /*
+         * imGui
+         */
+    	ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-	ImGui::ShowDemoWindow(&show_demo_window);
-	ImGui::Render();
-	
-        otNode root(1280);
 
+        ImGui::Begin("Particles");
+        ImGui::InputInt("Threshold", &threshold);
+        ImGui::End();
+
+	    ImGui::Render();
+
+        auto start = high_resolution_clock::now();
+        otNode root(threshold);
+        std::cout << "root "
+            << duration_cast<microseconds>(high_resolution_clock::now() - start).count() / 1000000.0
+            << std::endl;
+        start = high_resolution_clock::now();
         for (auto& n : nodes) {
             root.insert(&n);
         }
+        std::cout << "Insert "
+            << duration_cast<microseconds>(high_resolution_clock::now() - start).count() / 1000000.0
+            << std::endl;
+        start = high_resolution_clock::now();
         root.updateStats();
+        std::cout << "Update "
+            << duration_cast<microseconds>(high_resolution_clock::now() - start).count() / 1000000.0
+            << std::endl;
+        start = high_resolution_clock::now();
         // Calculate forces.
         for (auto& n : nodes) {
-            n.velocity += root.calcForce(&n, 0.7 /* theta */);
+            n.velocity += root.calcForce(&n, theta);
         }
+        std::cout << "Forces "
+            << duration_cast<microseconds>(high_resolution_clock::now() - start).count() / 1000000.0
+            << std::endl;
+        start = high_resolution_clock::now();
         for (auto& n : nodes) {
             n.position += n.velocity;
         }
+        std::cout << "Positions "
+            << duration_cast<microseconds>(high_resolution_clock::now() - start).count() / 1000000.0
+            << std::endl;
+        start = high_resolution_clock::now();
 
         glBufferData(GL_ARRAY_BUFFER, nodes.size() * sizeof(Node), nodes.data(), GL_STREAM_DRAW);
 
@@ -401,7 +433,7 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT);
 
         glDrawArrays(GL_POINTS, 0, numNodes);
-	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);
 
         glfwPollEvents();

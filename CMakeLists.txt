@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 FILE(GLOB imguiSrcs imgui/*.cpp)
 include_directories(imgui imgui/backends)
-set(CMAKE_CXX_FLAGS "-gdwarf-4 -Og")
+set(CMAKE_CXX_FLAGS "-O3")
 add_executable(gltoy main.cpp ${imguiSrcs} imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_opengl3.cpp)
 set(GLEW_USE_STATIC_LIBS True)
 find_package(GLEW REQUIRED)
