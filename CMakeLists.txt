@@ -3,7 +3,6 @@ project(Particle VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_CXX_FLAGS "-Og -gdwarf-4")
 
 FILE(GLOB imguiSrcs imgui/*.cpp)
 include_directories(imgui imgui/backends)
