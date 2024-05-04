@@ -12,10 +12,11 @@ find_package(GLEW REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(glm REQUIRED)
 find_package(glfw3 REQUIRED)
+find_package(TBB REQUIRED)
 
 add_executable(gltoy main.cpp ${imguiSrcs} imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_opengl3.cpp)
 
 target_link_libraries(gltoy ${OPENGL_LIBRARIES} glm::glm glfw  GLEW::GLEW )
 
 add_executable(Particle newbench.cpp)
-target_link_libraries(${PROJECT_NAME} PUBLIC glm::glm)
+target_link_libraries(${PROJECT_NAME} PUBLIC glm::glm TBB::tbb)
