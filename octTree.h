@@ -64,7 +64,7 @@ struct Node {
 
 class otNode
 {
- private:
+public:
   enum type_e { LEAF, NODE };
   type_e type;
 
@@ -80,7 +80,6 @@ class otNode
   float bboxSize = 0.0;
   glm::vec3 baryCenter;
 
- public:
  otNode(int t = 4) : threshold(t), center(0), baryCenter(0), type(LEAF)
     { }
   ~otNode() {
@@ -130,40 +129,40 @@ class otNode
     }
   }
 
-  void print(int i = 0, bool leafNodes = false) {
-    if (type == LEAF) {
-      if (nodes.empty())
-	return;
-      for (int c = 0; c < i; ++c) {
-	cout << " ";
-      }
-      cout << "Level " << i << " LEAF " << nodes.size() << " ";
-      bbox.print();
-      cout << " BC " << glm::to_string(baryCenter) << " W " << weight
-	   << " size " << bboxSize << endl;
-      if (leafNodes) {
-	for (auto& n : nodes) {
-	  for (int c = 0; c < i + 1; ++c) {
-	    cout << " ";
+  void print(int i = 0, string prefix = "0", bool leafNodes = false) {
+	  if (type == LEAF) {
+		  if (nodes.empty())
+			  return;
+		  for (int c = 0; c < i; ++c) {
+			  cout << " ";
+		  }
+		  cout << prefix << " LEAF " << nodes.size() << " ";
+		  bbox.print();
+		  cout << " BC " << glm::to_string(baryCenter) << " W " << weight
+			  << " size " << bboxSize << endl;
+		  if (leafNodes) {
+			  for (auto& n : nodes) {
+				  for (int c = 0; c < i + 1; ++c) {
+					  cout << " ";
+				  }
+				  cout << glm::to_string(n->position) << " " << n->weight << endl;
+			  }
+		  }
 	  }
-	  cout << glm::to_string(n->position) << " " << n->weight << endl;
-	}
-      }
-    }
-    else {
-      for (int c = 0; c < i; ++c) {
-	cout << " ";
-      }
-      cout << "Level " << i << " " << "NODE ";
-      bbox.print();
-      cout << " BC " << glm::to_string(baryCenter) << " W " << weight
-	   << " size " << bboxSize << endl;
-    }
-    if (type == NODE) {
-      for (auto& c : children) {
-	c->print(i + 1, leafNodes);
-      }
-    }
+	  else {
+		  for (int c = 0; c < i; ++c) {
+			  cout << " ";
+		  }
+		  cout << prefix << " " << i << " " << "NODE ";
+		  bbox.print();
+		  cout << " BC " << glm::to_string(baryCenter) << " W " << weight
+			  << " size " << bboxSize << endl;
+	  }
+      string s[] = { "0", "1", "2", "3", "4", "5", "6", "7" };
+	  if (type == NODE) {
+          for (int i = 0; i < 8; ++i)
+              children[i]->print(i + 1, prefix + s[i], leafNodes);
+	  }
   }
 
   // Function for calculating the accelerate on m1 by m2
@@ -178,14 +177,19 @@ class otNode
   }
 
   void insertNodes(vector<Node>& nodes) {
+      /*
     std::for_each(std::execution::par_unseq, nodes.begin(), nodes.end(),
 		  [&](auto& n) {
 		    insert(&n);
 		  });
+          */
+      for (auto& n : nodes) {
+          insert(&n);
+      }
   }
   void insert(Node* n) {
     if (type == NODE) {
-      glm::vec3 cmp = glm::lessThan(n->position, center);
+      glm::vec3 cmp = glm::greaterThan(n->position, center);
       int oct = cmp.x * 2 + cmp.y * 1 + cmp.z * 4;
       children[oct]->insert(n);
     }
@@ -213,10 +217,9 @@ class otNode
 	  center /= nodes.size();
 	  type = NODE;
 	  lock.unlock();
-	  std::for_each(std::execution::par_unseq, nodes.begin(), nodes.end(),
-			[&](auto& n) {
-			  this->insert(n);
-			});
+      for (auto& n : nodes) {
+          insert(n);
+      }
 	} else {
 	  lock.unlock();
 	}

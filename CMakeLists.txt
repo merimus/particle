@@ -14,9 +14,11 @@ find_package(glm REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(TBB REQUIRED)
 
+find_package(SDL3 REQUIRED CONFIG REQUIRED COMPONENTS SDL3-shared)
+
 add_executable(gltoy main.cpp ${imguiSrcs} imgui/backends/imgui_impl_glfw.cpp imgui/backends/imgui_impl_opengl3.cpp)
 
 target_link_libraries(gltoy ${OPENGL_LIBRARIES} glm::glm glfw  GLEW::GLEW )
 
 add_executable(Particle newbench.cpp)
-target_link_libraries(${PROJECT_NAME} PUBLIC glm::glm TBB::tbb)
+target_link_libraries(${PROJECT_NAME} PUBLIC glm::glm TBB::tbb SDL3::SDL3)
