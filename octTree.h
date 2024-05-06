@@ -177,15 +177,10 @@ public:
   }
 
   void insertNodes(vector<Node>& nodes) {
-      /*
     std::for_each(std::execution::par_unseq, nodes.begin(), nodes.end(),
 		  [&](auto& n) {
 		    insert(&n);
-		  });
-          */
-      for (auto& n : nodes) {
-          insert(&n);
-      }
+		  });          
   }
   void insert(Node* n) {
     if (type == NODE) {
