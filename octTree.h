@@ -212,9 +212,10 @@ public:
 	  center /= nodes.size();
 	  type = NODE;
 	  lock.unlock();
-      for (auto& n : nodes) {
-          insert(n);
-      }
+	  std::for_each(std::execution::par_unseq, nodes.begin(), nodes.end(),
+		  [&](auto n) {
+		    insert(n);
+		  });
 	} else {
 	  lock.unlock();
 	}
