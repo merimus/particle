@@ -12,15 +12,6 @@ printTimer(high_resolution_clock::time_point start, std::string msg) {
   return high_resolution_clock::now();
 }
 
-glm::vec3 project(bbox_t& bbox, glm::vec3 point) {
-    float width = bbox.max.x - bbox.min.x;
-    float height = bbox.max.y - bbox.min.y;
-
-    return glm::vec3((point.x - bbox.min.x) / width * 1024.0,
-        (point.y - bbox.min.y) / height * 1024.0,
-        1.0);
-}
-
 int main(int argc, char* argv[]) {
     unsigned int numNodes = 100;
     unsigned int threshold = 8;
